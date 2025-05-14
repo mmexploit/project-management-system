@@ -7,30 +7,26 @@ import {
   TextInput,
   Text,
   ActionIcon,
-  Popover,
   Pill,
   InputBase,
   Tooltip,
 } from "@mantine/core";
 import {
-  IconAdjustmentsHorizontal,
   IconChevronUp,
-  IconCirclePlus,
   IconDots,
   IconEdit,
   IconEye,
-  IconFilter,
   IconPlus,
   IconSearch,
   IconSelector,
   IconTrash,
   IconX,
 } from "@tabler/icons-react";
-import { DataTable, DataTableColumn } from "mantine-datatable";
+import { DataTable } from "mantine-datatable";
 import React, { useEffect, useState } from "react";
-import { EntityProps, FilterConfig } from "./model/entity.model";
+import { EntityProps } from "./model/entity.model";
 import { useRouter } from "next/navigation";
-import { useDebouncedState, useDisclosure } from "@mantine/hooks";
+import { useDebouncedState } from "@mantine/hooks";
 import Section from "../section/section.component";
 import { Where } from "../collection/model/query.model";
 import { modals } from "@mantine/modals";
