@@ -47,8 +47,12 @@ export default function UserDetail() {
       role: z.enum(["user", "admin"]),
     })
     .refine(
-      (data) =>
-        id !== "new" && (data.password !== null || data.password !== ""),
+      (data) => {
+        if (id == "new") {
+          return data.password !== null;
+        }
+        return true;
+      },
       {
         path: ["password"],
         message: "Password is required.",
@@ -179,7 +183,7 @@ export default function UserDetail() {
                   />
                 )}
               />
-              {id !== "new" && (
+              {id == "new" && (
                 <PasswordInput
                   label="Password"
                   placeholder="Password"
