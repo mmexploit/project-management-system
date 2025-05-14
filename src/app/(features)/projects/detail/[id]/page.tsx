@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { SetStateAction, Dispatch, useEffect, useState } from "react";
 import {
   DragDropContext,
   Droppable,
@@ -12,7 +12,7 @@ import {
   DraggableStateSnapshot,
 } from "@hello-pangea/dnd";
 import { IconArrowLeft } from "@tabler/icons-react";
-import { Avatar, Button, Stack, Tooltip } from "@mantine/core";
+import { Avatar, Button, Stack, Tooltip, Modal } from "@mantine/core";
 import { Flex, Text } from "@mantine/core";
 import { useRouter, useParams } from "next/navigation";
 import { InitialData, Task, Column as ColumnType } from "@/models/task.model";
@@ -20,7 +20,15 @@ import AddTask from "../../_components/add-task";
 import { createClient } from "@/utils/supabase/client";
 import { notifications } from "@mantine/notifications";
 import { Project } from "@/models/project.model";
-
+import { useQuery, useMutation } from "@tanstack/react-query";
+import {
+  getTasks,
+  createTask,
+  updateTask,
+  updateTaskStatus,
+} from "../../_api/tasks.api";
+import { getProjectById } from "../../_api/project.api";
+import { useDisclosure } from "@mantine/hooks";
 // Initial data
 const columnsDefinition: InitialData = {
   tasks: {},
@@ -45,7 +53,17 @@ const columnsDefinition: InitialData = {
 };
 
 // Components
-const TaskComponent = ({ task, index }: { task: Task; index: number }) => (
+const TaskComponent = ({
+  task,
+  index,
+  setSelectedTask,
+  open,
+}: {
+  task: Task;
+  index: number;
+  setSelectedTask: Dispatch<SetStateAction<string | null>>;
+  open: () => void;
+}) => (
   <Draggable draggableId={task?.id} index={index}>
     {(provided: DraggableProvided, snapshot: DraggableStateSnapshot) => (
       <div
@@ -55,7 +73,10 @@ const TaskComponent = ({ task, index }: { task: Task; index: number }) => (
         className={`bg-white p-3 rounded-md shadow flex flex-col ${
           snapshot.isDragging ? "shadow-lg" : ""
         }`}
-        onClick={() => console.log(task)}
+        onClick={() => {
+          open();
+          setSelectedTask(task?.id);
+        }}
       >
         <Text>{task?.name}</Text>
         <Tooltip label={task?.assignee?.name}>
@@ -68,7 +89,17 @@ const TaskComponent = ({ task, index }: { task: Task; index: number }) => (
   </Draggable>
 );
 
-const Column = ({ column, tasks }: { column: ColumnType; tasks: Task[] }) => (
+const Column = ({
+  column,
+  tasks,
+  setSelectedTask,
+  open,
+}: {
+  column: ColumnType;
+  tasks: Task[];
+  setSelectedTask: Dispatch<SetStateAction<string | null>>;
+  open: () => void;
+}) => (
   <div className="bg-blue-100 p-4 rounded-lg">
     <h2 className="text-xl font-semibold mb-4">{column.title}</h2>
     <Droppable droppableId={column.id}>
@@ -81,7 +112,13 @@ const Column = ({ column, tasks }: { column: ColumnType; tasks: Task[] }) => (
           }`}
         >
           {tasks.map((task, index) => (
-            <TaskComponent key={task?.id} task={task} index={index} />
+            <TaskComponent
+              key={task?.id}
+              task={task}
+              index={index}
+              setSelectedTask={setSelectedTask}
+              open={open}
+            />
           ))}
           {provided.placeholder}
         </div>
@@ -124,34 +161,69 @@ export default function KanbanBoard() {
   const [state, setState] = useState<InitialData>(columnsDefinition);
   const router = useRouter();
   const { id } = useParams();
-  const supabase = createClient();
-  const [project, setProject] = useState<Project | null>(null);
+  const [opened, { open, close }] = useDisclosure(false);
+  const [selectedTask, setSelectedTask] = useState<string | null>(null);
+  const { data: tasks, isLoading: isTasksLoading } = useQuery({
+    queryKey: ["tasks", id],
+    queryFn: () => getTasks(id?.toString() ?? ""),
+  });
+  const { data: project, isLoading: isProjectLoading } = useQuery({
+    queryKey: ["project", id],
+    queryFn: () => getProjectById(id?.toString() ?? ""),
+  });
+  const {
+    mutateAsync: updateTaskStatusHandler,
+    isPending: isUpdatingTaskStatus,
+  } = useMutation({
+    mutationFn: ({ taskId, status }: { taskId: string; status: string }) =>
+      updateTaskStatus(taskId, status),
+  });
+  const { mutateAsync: updateTaskHandler, isPending: isUpdatingTask } =
+    useMutation({
+      mutationFn: (task: Task) => updateTask(task),
+      onSuccess: () => {
+        notifications.show({
+          title: "Task updated",
+          message: "Task updated successfully",
+          color: "green",
+        });
+      },
+      onError: (error) => {
+        notifications.show({
+          title: "Error",
+          message: error.message ?? "Failed to update task",
+          color: "red",
+        });
+      },
+    });
+  const { mutateAsync: createTaskHandler, isPending: isCreatingTask } =
+    useMutation({
+      mutationFn: (task: Task) => createTask(task),
+      onSuccess: () => {
+        notifications.show({
+          title: "Task created",
+          message: "Task created successfully",
+          color: "green",
+        });
+      },
+      onError: (error) => {
+        notifications.show({
+          title: "Error",
+          message: error.message ?? "Failed to add task",
+          color: "red",
+        });
+      },
+    });
 
   useEffect(() => {
-    const fetchProjectAndTasks = async () => {
-      const { data, error } = await supabase
-        .from("projects")
-        .select("*")
-        .eq("id", id);
-      const { data: tasks, error: tasksError } = await supabase
-        .from("tasks")
-        .select("*")
-        .eq("project_id", id);
-      if (error) {
-        console.error(error);
-      } else if (data) {
-        setProject(data[0]);
-      }
-      if (tasksError) {
-        console.error(tasksError);
-      } else if (tasks) {
-        const reformattedState = transformTasksToBoardFormat(tasks);
-        setState(reformattedState);
-        console.log(reformattedState, "reformattedApiState");
-      }
-    };
-    fetchProjectAndTasks();
-  }, [id]);
+    if (tasks) {
+      const reformattedState =
+        tasks?.data && tasks?.data?.length > 0
+          ? transformTasksToBoardFormat(tasks?.data ?? [])
+          : columnsDefinition;
+      setState(reformattedState);
+    }
+  }, [tasks]);
 
   console.log(state, "state");
 
@@ -159,22 +231,15 @@ export default function KanbanBoard() {
     if (taskToAdd) {
       const reformattedTask = {
         name: taskToAdd.name,
-        assignee_id: taskToAdd.assignee.assignee_id,
+        assignee_id: taskToAdd?.assignee?.assignee_id,
         project_id: id?.toString(),
         status: "todo",
       };
-      const { data, error } = await supabase
-        .from("tasks")
-        .insert(reformattedTask)
-        .select();
+      const { error } = await createTaskHandler(
+        reformattedTask as unknown as Task
+      );
 
-      if (error) {
-        notifications.show({
-          title: "Error",
-          message: error.message ?? "Failed to add task",
-          color: "red",
-        });
-      } else {
+      if (!error) {
         setState((prevState) => ({
           ...prevState,
           tasks: {
@@ -189,8 +254,19 @@ export default function KanbanBoard() {
             },
           },
         }));
+        close();
       }
     }
+  };
+
+  const updateTaskCallback = async (task: Task) => {
+    const { error } = await updateTaskHandler(task);
+    const reformattedTask = {
+      name: task.name,
+      assignee_id: task?.assignee?.assignee_id,
+      project_id: id?.toString(),
+      status: task.status,
+    };
   };
 
   const onDragEnd = async (result: DropResult) => {
@@ -252,12 +328,12 @@ export default function KanbanBoard() {
       },
     }));
 
-    const { data, error } = await supabase
-      .from("tasks")
-      .update({ status: destination.droppableId })
-      .eq("id", draggableId);
+    const { error: updateError } = await updateTaskStatusHandler({
+      taskId: draggableId,
+      status: destination.droppableId,
+    });
 
-    if (error) {
+    if (updateError) {
       setState(prevState);
     }
   };
@@ -268,14 +344,28 @@ export default function KanbanBoard() {
         <Flex className="items-center justify-between">
           <Flex className="flex-col gap-2">
             <Text fz={"h3"} className="font-semibold">
-              {project?.name}
+              {project?.data?.name}
             </Text>
             <Text c="dimmed" size="sm">
               Tasks
             </Text>
           </Flex>
           <Flex className="gap-2">
-            <AddTask addTask={addTask} />
+            <Button
+              onClick={() => {
+                open();
+                setSelectedTask(null);
+              }}
+            >
+              Add Task
+            </Button>
+            <Modal opened={opened} onClose={close} title="Add Task">
+              <AddTask
+                addTask={addTask}
+                selectedTask={selectedTask}
+                close={close}
+              />
+            </Modal>
             <Button
               variant="outline"
               leftSection={<IconArrowLeft />}
@@ -293,7 +383,15 @@ export default function KanbanBoard() {
             {state.columnOrder.map((columnId) => {
               const column = state.columns[columnId];
               const tasks = column.taskIds.map((taskId) => state.tasks[taskId]);
-              return <Column key={column.id} column={column} tasks={tasks} />;
+              return (
+                <Column
+                  key={column.id}
+                  column={column}
+                  tasks={tasks}
+                  setSelectedTask={setSelectedTask}
+                  open={open}
+                />
+              );
             })}
           </div>
         </DragDropContext>

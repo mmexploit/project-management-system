@@ -2,8 +2,15 @@
 
 import { jwtDecode } from "jwt-decode";
 import { hasCookie, deleteCookie, getCookie, setCookie } from "cookies-next";
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, {
+  createContext,
+  JSX,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/services/supabaseClient";
 
 interface AuthContextValue {
   user: Record<string, any> | undefined | null;
@@ -22,24 +29,38 @@ function AuthProvider({
   children: React.ReactNode;
 }): JSX.Element {
   const [error, setError] = useState<any>();
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<any>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const router = useRouter();
   const token = getCookie("token");
 
+  async function getUser() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    return user;
+  }
+
   useEffect(() => {
-    setUser(token ? jwtDecode(token) : null);
+    getUser().then((user) => {
+      setUser(user);
+    });
+  }, []);
+
+  useEffect(() => {
+    setUser(token ? jwtDecode(token as string) : null);
   }, [token]);
 
   useEffect(() => {
-    const isSignedIn = hasCookie("token");
+    const isSignedIn = hasCookie("token") as boolean;
+
     setIsAuthenticated(isSignedIn);
   }, []);
 
   useEffect(() => {
     const token = getCookie("token");
     if (token) {
-      const userInfo: Record<string, any> = jwtDecode(token);
+      const userInfo: Record<string, any> = jwtDecode(token as string);
       setUser(userInfo as any);
     }
   }, []);
@@ -51,7 +72,7 @@ function AuthProvider({
   const hasRole = (role: string | string[]) => {
     const token = getCookie("token");
     const user: Record<string, any> | undefined = token
-      ? (jwtDecode(token) as Record<string, any>)
+      ? (jwtDecode(token as string) as Record<string, any>)
       : undefined;
     if (!user || !role || !user?.role) return false;
     if (user?.role == "SUPER_ADMIN") return true;
@@ -71,7 +92,7 @@ function AuthProvider({
   };
 
   return (
-    <AuthContext.Provider value={authContextValue}>
+    <AuthContext.Provider value={authContextValue as AuthContextValue}>
       {children}
     </AuthContext.Provider>
   );

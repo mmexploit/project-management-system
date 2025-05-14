@@ -4,7 +4,7 @@ export interface Task {
   name: string;
   status: string;
   project_id?: string;
-  assignee: { name: string; assignee_id: string };
+  assignee?: { name: string; assignee_id: string };
 }
 
 export interface Column {

@@ -37,10 +37,10 @@ export function LinksGroup({
   const hasLinks = Array.isArray(links);
   const pathname = usePathname();
   const [opened, setOpened] = useState(initiallyOpened || false);
-  const { hasRole } = useAuth();
+  const { user } = useAuth();
   const items = (hasLinks ? links : []).map((link) => {
     const Icon = link.icon;
-    if (hasRole((link as any).permissions)) {
+    if (permissions?.includes(user?.user_metadata?.role)) {
       return (
         <Link
           className={`${classes.link} ${
@@ -62,7 +62,7 @@ export function LinksGroup({
     }
   });
 
-  if (permissions && hasRole(permissions)) {
+  if (permissions?.includes(user?.user_metadata?.role)) {
     return (
       <>
         <UnstyledButton
