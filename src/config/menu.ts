@@ -48,4 +48,12 @@ export const menu = {
       permissions: ["admin"],
     },
   ],
+  Others: [
+    {
+      label: "Log Out",
+      icon: IconLogout,
+      link: "/auth/log-out",
+      permissions: ["user", "admin"],
+    },
+  ],
 };
