@@ -13,6 +13,7 @@ import { supabase } from "@/utils/supabase/admin-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { deleteTask, getTaskById, updateTask } from "../_api/tasks.api";
 import { getUsers } from "../_api/users.api";
+import { v4 as uuidv4 } from "uuid";
 const schema = z.object({
   name: z.string().min(1),
   assignee_id: z.string().min(1),
@@ -87,6 +88,7 @@ export default function AddTask({
         });
         reset();
         queryClient.invalidateQueries({ queryKey: ["tasks"] });
+        queryClient.invalidateQueries({ queryKey: ["task", selectedTask] });
         close();
       },
       onError: (error) => {
@@ -108,7 +110,7 @@ export default function AddTask({
       close();
     } else {
       addTask({
-        id: crypto.randomUUID(),
+        id: uuidv4(),
         name: data.name,
         assignee: {
           name:

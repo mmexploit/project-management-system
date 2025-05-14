@@ -20,7 +20,7 @@ import AddTask from "../../_components/add-task";
 import { createClient } from "@/utils/supabase/client";
 import { notifications } from "@mantine/notifications";
 import { Project } from "@/models/project.model";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getTasks,
   createTask,
@@ -226,6 +226,7 @@ export default function KanbanBoard() {
   }, [tasks]);
 
   console.log(state, "state");
+  const queryClient = useQueryClient();
 
   const addTask = async (taskToAdd: Task) => {
     if (taskToAdd) {
@@ -238,6 +239,7 @@ export default function KanbanBoard() {
       const { error } = await createTaskHandler(
         reformattedTask as unknown as Task
       );
+      queryClient.invalidateQueries({ queryKey: ["tasks", id] });
 
       if (!error) {
         setState((prevState) => ({
