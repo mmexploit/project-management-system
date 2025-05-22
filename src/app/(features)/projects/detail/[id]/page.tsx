@@ -100,7 +100,9 @@ const Column = ({
   setSelectedTask: Dispatch<SetStateAction<string | null>>;
   open: () => void;
 }) => (
-  <div className="bg-blue-100 p-4 rounded-lg">
+  <div
+    className={`${column.id === "todo" ? "bg-blue-100" : column.id === "in-progress" ? "bg-yellow-100" : column.id === "done" ? "bg-green-100" : "bg-blue-100"} p-4 rounded-lg`}
+  >
     <h2 className="text-xl font-semibold mb-4">{column.title}</h2>
     <Droppable droppableId={column.id}>
       {(provided: DroppableProvided, snapshot: DroppableStateSnapshot) => (
@@ -223,7 +225,7 @@ export default function KanbanBoard() {
           : columnsDefinition;
       setState(reformattedState);
     }
-  }, [tasks]);
+  }, [tasks, id]);
 
   console.log(state, "state");
   const queryClient = useQueryClient();
@@ -252,7 +254,9 @@ export default function KanbanBoard() {
             ...prevState.columns,
             todo: {
               ...prevState.columns["todo"],
-              taskIds: [...prevState.columns["todo"].taskIds, taskToAdd.id],
+              taskIds: Array.from(
+                new Set([...prevState.columns["todo"].taskIds, taskToAdd.id])
+              ),
             },
           },
         }));
